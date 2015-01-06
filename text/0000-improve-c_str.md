@@ -166,3 +166,10 @@ overhead. Need a clearer idea on usefulness and performance gains.
 
 Bring along `c_vec`, perhaps with harmonization regarding
 destructor polymorphism?
+
+# Acknowledgements
+
+Thanks to Alex Crichton for helpful comments and bringing forward many
+ideas that went into his ultimately accepted RFC, while also being used
+in this proposed library. Andrew Cann and Daniel Micay contributed valuable
+insights in discussion over this RFC and related issues.
