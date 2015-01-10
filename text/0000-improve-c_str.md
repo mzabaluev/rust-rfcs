@@ -6,7 +6,7 @@
 
 Relocation and interface changes for the Rust library module `c_str`.
 The redesigned module is available as a
-[standalone project](https://github.com/mzabaluev/rust-c-compat).
+[standalone project](https://github.com/mzabaluev/rust-c-str).
 
 * Move the `c_str` module out of `std` to free the standard library from
   public type dependencies on `libc`.
@@ -59,11 +59,9 @@ functions expecting C strings.
 
 To disentangle `std` from the definition of `libc::c_char`,
 `c_str` is moved into a separate crate that is free to depend on `std`
-and `libc`. A GitHub project
-[c_compat](https://github.com/mzabaluev/rust-c-compat) has been
-derived from Rust project source to implement proposed changes.
-If the RFC is accepted, this code could be contributed back to the Rust
-source tree.
+and `libc`. A [GitHub project] (https://github.com/mzabaluev/rust-c-str)
+has been derived from Rust project source to implement the proposed
+changes.
 
 ## Generic destructors for CString
 
