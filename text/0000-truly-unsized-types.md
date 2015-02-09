@@ -4,10 +4,9 @@
 
 # Summary
 
-Further subdivide unsized types into dynamically-sized types, implementing
-an intrinsic trait `DynamicSize`, and types of indeterminate size. References
-for the latter kind will be thin, while allocating slots or copying values
-of such types is not possible outside unsafe code.
+Allow opting out of `Sized` for types with statically-sized contents.
+Pointers to unsized non-DSTs will be thin, while allocating slots or
+copying values of such types is not possible outside unsafe code.
 
 # Motivation
 
@@ -31,46 +30,76 @@ If mutable references are available, there is added trouble with
 
 # Detailed design
 
-The types that do not implement `Sized` are further subdivided into DSTs
-and types of indeterminate size.
+Any type with statically-sized contents can be opted out of `Sized`:
 
-## Truly unsized types
-
-Any type with sized contents can be opted out of `Sized` by including
-a marker `NotSized`, which also implies `NoCopy`:
 ```rust
 struct CStr {
-    head: libc::c_char,  // Contains at least one character...
-    rest: std::marker::NotSized  // ...but there can be more
+    head: libc::c_char  // Contains at least one character...
+}
+
+impl !Sized for CStr { }  // ...but there can be more
+```
+
+This ensures that a slot cannot be created with type `CStr`, and makes
+references to values of such types unusable for copying the value out,
+`std::mem::swap`, being the source in `transmute_copy`, etc.
+The type cannot be the parameter of `size_of`, so the size of declared
+type contents is never made to matter.
+
+Current generic code may use the `Sized` bound on a type, often implicit,
+to ensure that a reference can be converted to or from a raw pointer.
+To allow unsized types, such code would need to be changed to use conversion
+traits like the following:
+
+```rust
+pub trait AsPtr<Raw = Self> {
+    fn as_ptr(&self) -> *const Raw;
+}
+
+pub trait AsMutPtr<Raw = Self> {
+    fn as_mut_ptr(&mut self) -> *mut Raw;
+}
+
+pub trait FromPtr<Raw = Self> {
+    unsafe fn from_ptr<'a>(ptr: *const Raw) -> &'a Self;
+}
+
+pub trait FromMutPtr<Raw = Self> {
+    unsafe fn from_mut_ptr<'a>(ptr: *mut Raw) -> &'a mut Self;
+}
+
+impl<T> AsPtr<T> for T where T: Sized {
+    fn as_ptr(&self) -> *const T { self as *const T }
+}
+
+impl<T> AsMutPtr<T> for T where T: Sized {
+    fn as_mut_ptr(&mut self) -> *mut T { self as *mut T }
+}
+
+impl<T> FromPtr<T> for T where T: Sized {
+    unsafe fn from_ptr<'a>(ptr: *const T) -> &'a T {
+        std::mem::transmute(&*ptr)
+    }
+}
+
+impl<T> FromMutPtr<T> for T where T: Sized {
+    unsafe fn from_mut_ptr<'a>(ptr: *mut T) -> &'a mut T {
+        std::mem::transmute(&mut *ptr)
+    }
 }
 ```
 
-This makes references to values of such types unusable for copying
-the value out, `std::mem::swap`, being the source in
-`transmute_copy`, etc. Unsized types can't be used as the
-type parameter of `size_of`.
-
-## Dynamically sized types
-
-Plain old (ahem) dynamically sized types will intrinsically implement
-a newly introduced trait, `DynamicSize`. Only references to `DynamicSize`
-types will be fat.
-
-# Fallout
-
-There may be cases where `!Sized` is taken to mean DSTs. These will have to
-switch to using the `DynamicSize` bound.
-
-Specifically, there are generic items where the `Sized` bound is not
-lifted only to ensure that a reference is thin, so as to be coerced or
-transmuted to a raw pointer. These will not be usable with truly unsized
-types, and should get the type bound relaxed to `?Sized` and a
-[negative bound](https://github.com/rust-lang/rfcs/pull/586)
-on `DynamicSize`.
+Unsized types can have these traits implemented manually, or, with added
+compiler support, get them with `#[derive(...)]`.
 
 # Drawbacks
 
-This is adding further complexity to the type system.
+The change adds further complexity to the type system.
+
+Auditing existing libraries for possibilities to replace the implicit `Sized`
+bound with pointer conversion traits will be tedious. The changes will not be
+backwards-compatible on the ABI level (which probably no one cares about
+in Rust 1.0 timeframe anyway).
 
 # Alternatives
 
@@ -83,5 +112,6 @@ with the overall philosophy of Rust, though.
 
 # Unresolved questions
 
-For convenience, there could be an intrinsically implemented trait
-that is a negation of `DynamicSize`.
+Should pointer conversion traits `AsPtr`, `FromPtr`, etc. as described above,
+be enshrined into the core libraries and given compiler support for
+`#[derive()]`?
