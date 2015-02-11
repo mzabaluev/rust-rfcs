@@ -133,4 +133,8 @@ with the overall philosophy of Rust, though.
 
 Should pointer conversion traits `AsPtr`, `FromPtr`, etc. as described above,
 be enshrined into the core libraries and given compiler support for
-`#[derive()]`?
+`#[derive()]`? These traits can be implemented now without compiler changes;
+would it make sense to land them earlier? This would open the way to
+adaptation of code for the eventual landing of `!Sized`, and support generic
+code where conversion between thin pointers and non-statically sized values
+is appropriate.
