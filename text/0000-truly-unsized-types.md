@@ -90,7 +90,26 @@ impl<T> FromMutPtr<T> for T where T: Sized {
 ```
 
 Unsized types can have these traits implemented manually, or, with added
-compiler support, get them with `#[derive(...)]`.
+compiler support, get them with `#[derive(...)]`. The same traits also make it
+possible to convert between thin pointers and DSTs where such transformations
+can be done losslessly. Suppose that a C string is represented by a DST:
+
+```rust
+// Asserted to be null-terminated
+pub struct CStr {
+    chars: [c_char]
+}
+
+impl AsPtr<c_char> for CStr {
+    fn as_ptr(&self) -> *const c_char { self.chars.as_ptr() }
+}
+
+impl FromPtr<c_char> for CStr {
+    unsafe fn from_ptr<'a>(ptr: *const c_char) -> &'a CStr {
+        transmute(slice::from_raw_parts(ptr, libc::strlen() as usize))
+    }
+}
+```
 
 # Drawbacks
 
